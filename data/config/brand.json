@@ -1,0 +1,15 @@
+{
+  "account_name": "（表示名）",
+  "handle": "@（ユーザーネーム）",
+  "palette": {
+    "bg": "#F6F1E7",
+    "ink": "#3B2F2A",
+    "sub": "#7A685C",
+    "accent": "#7A4E2D",
+    "accent2": "#C9A227",
+    "line": "#DCD1BE"
+  },
+  "cards_repo": "YT-SDK/（カード置き場の公開リポジトリ名）",
+  "cards_clone_dir": "/home/user/（カード置き場のリポジトリ名）",
+  "cards_base_url": "https://raw.githubusercontent.com/YT-SDK/（カード置き場の公開リポジトリ名）/main/c/"
+}

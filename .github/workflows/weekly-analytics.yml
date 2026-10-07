@@ -1,0 +1,41 @@
+name: daily analytics (ステップ6-7 分析と学習)
+
+on:
+  schedule:
+    - cron: "13 21 * * *" # 毎日 06:13 JST（朝の投稿の前に学習結果を更新）
+  workflow_dispatch:
+
+concurrency:
+  group: threads-publish # publish と同じグループにしてコミット競合を避ける
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  analytics:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Fetch insights
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+        run: python -m threads_auto fetch-insights
+      - name: Update format ranking / idea weights / report
+        run: |
+          python -m threads_auto update-weights
+          cat "$(ls -t data/reports/*.md | head -1)" >> "$GITHUB_STEP_SUMMARY"
+      - name: Commit state
+        run: |
+          git config user.name "threads-bot"
+          git config user.email "threads-bot@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "chore(threads): daily analytics $(date -u +%Y-%m-%d)"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep $((i*5)); done
+          exit 1

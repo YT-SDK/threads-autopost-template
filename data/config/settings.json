@@ -1,0 +1,23 @@
+{
+  "timezone": "Asia/Tokyo",
+  "posting_slots": [
+    "07:15",
+    "12:05",
+    "21:00"
+  ],
+  "posting_slots_weekend": [
+    "09:45",
+    "13:00",
+    "21:00"
+  ],
+  "require_human_approval": true,
+  "max_posts_per_run": 1,
+  "min_interval_minutes": 60,
+  "expire_hours": 24,
+  "max_attempts": 3,
+  "insights_lookback_days": 14,
+  "eval_age_hours": 24,
+  "scoring_window_days": 14,
+  "smoothing_k": 2,
+  "review_pass_score": 80
+}

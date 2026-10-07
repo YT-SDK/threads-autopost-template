@@ -1,0 +1,51 @@
+name: publish (ステップ5 予約投稿)
+
+on:
+  schedule:
+    - cron: "7 * * * *" # 毎時7分（UTC）。Actions の cron は数分〜十数分遅れることがある
+    # 投稿枠の直後にも動かす（毎時だけだと 07:30 枠が 08:20 頃まで出なかったため）
+    # 平日 07:15 / 12:05 / 21:00、土日 09:45 / 13:00 / 21:00（data/config/settings.json の枠に合わせる）
+    - cron: "16 22 * * 0-4" # 平日 07:16 JST（UTC の日〜木）
+    - cron: "6 3 * * 1-5"   # 平日 12:06 JST
+    - cron: "46 0 * * 6,0"  # 土日 09:46 JST
+    - cron: "1 4 * * 6,0"   # 土日 13:01 JST
+    - cron: "1 12 * * *"    # 毎日 21:01 JST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "実際には投稿しない"
+        type: boolean
+        default: false
+
+# 同時実行による二重投稿を防ぐ
+concurrency:
+  group: threads-publish
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Publish due posts
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+          DRY_RUN: ${{ inputs.dry_run && '1' || vars.DRY_RUN }}
+        run: python -m threads_auto publish-due
+      - name: Commit state
+        run: |
+          git config user.name "threads-bot"
+          git config user.email "threads-bot@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "chore(threads): publish $(date -u +%Y-%m-%dT%H:%MZ)"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep $((i*5)); done
+          exit 1

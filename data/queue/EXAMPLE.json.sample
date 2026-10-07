@@ -1,0 +1,17 @@
+{
+  "id": "20261001-0730-f01-onboarding",
+  "text": "新人研修で「全部教える」のはやめた方がいい。\n\n…（本文 500字以内）",
+  "replies": ["（任意）スレッドの続き。各500字以内。公開時に本文への返信としてつながります"],
+  "format_id": "F01",
+  "idea_id": "I001",
+  "tags": ["新人育成", "研修設計"],
+  "scheduled_at": "2026-10-01T07:30:00+09:00",
+  "status": "queued",
+  "review": {
+    "status": "approved",
+    "score": 86,
+    "reviewer": "post-reviewer",
+    "notes": "フックが具体的。根拠の出典不要な経験談として成立。",
+    "human_approved": false
+  }
+}

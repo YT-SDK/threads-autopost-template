@@ -1,0 +1,49 @@
+name: approve (人の最終承認)
+
+# GitHub の Actions 画面から本人が手動で実行する。
+# AIレビュー合格済み（review.status=approved）の投稿だけを human_approved=true にする。
+on:
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: "承認する投稿のID（空白区切り）。空欄ならAIレビュー合格済みの全件"
+        type: string
+        default: ""
+
+concurrency:
+  group: threads-queue-write
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate queue
+        run: python -m threads_auto validate
+      - name: Approve
+        env:
+          IDS: ${{ inputs.ids }}
+        run: |
+          if [ -z "$IDS" ]; then
+            python -m threads_auto approve --all
+          else
+            python -m threads_auto approve $IDS
+          fi
+          python -m threads_auto status
+      - name: Commit state
+        run: |
+          git config user.name "threads-bot"
+          git config user.email "threads-bot@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then echo "no changes"; exit 0; fi
+          git commit -m "approve: human approval by ${{ github.actor }}"
+          for i in 1 2 3; do git pull --rebase && git push && exit 0; sleep $((i*5)); done
+          exit 1

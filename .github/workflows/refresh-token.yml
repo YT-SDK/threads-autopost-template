@@ -1,0 +1,40 @@
+name: refresh token (長期トークン延長)
+
+# Threads の長期トークンは60日で失効する。毎月1日と15日に延長する。
+# 新トークンを Secret に書き戻すには、Secrets 書き込み権限を持つ PAT を
+# GH_SECRETS_PAT として登録しておく（fine-grained: 対象リポジトリの Secrets: Read and write）。
+on:
+  schedule:
+    - cron: "11 1 1,15 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Refresh long-lived token
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$THREADS_ACCESS_TOKEN" ]; then echo "トークン未登録のためスキップ（docs/token-setup.md）"; exit 0; fi
+          python -m threads_auto refresh-token --output "$RUNNER_TEMP/token.json"
+      - name: Update repository secret
+        env:
+          GH_TOKEN: ${{ secrets.GH_SECRETS_PAT }}
+        run: |
+          if [ ! -f "$RUNNER_TEMP/token.json" ]; then exit 0; fi
+          if [ -z "$GH_TOKEN" ]; then
+            echo "::warning::GH_SECRETS_PAT が未設定のため Secret を更新できません。トークンは延長されましたが値は変わる可能性があるため、README の手順で手動更新してください。"
+            exit 0
+          fi
+          python -c "import json,sys;print(json.load(open(sys.argv[1]))['access_token'],end='')" "$RUNNER_TEMP/token.json" \
+            | gh secret set THREADS_ACCESS_TOKEN --repo "$GITHUB_REPOSITORY"
+          rm -f "$RUNNER_TEMP/token.json"
