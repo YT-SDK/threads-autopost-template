@@ -39,7 +39,10 @@ jobs:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
           DRY_RUN: ${{ inputs.dry_run && '1' || vars.DRY_RUN }}
-        run: python -m threads_auto publish-due
+        run: |
+          # トークン未登録（ひな形や立ち上げ中のリポジトリ）は何もせず終える
+          if [ -z "$THREADS_ACCESS_TOKEN" ]; then echo "トークン未登録のためスキップ（docs/token-setup.md）"; exit 0; fi
+          python -m threads_auto publish-due
       - name: Commit state
         run: |
           git config user.name "threads-bot"

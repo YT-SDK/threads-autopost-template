@@ -25,12 +25,17 @@ jobs:
         env:
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
-        run: python -m threads_auto fetch-insights
+        run: |
+          # トークン未登録（ひな形や立ち上げ中のリポジトリ）は何もせず終える
+          if [ -z "$THREADS_ACCESS_TOKEN" ]; then echo "トークン未登録のためスキップ（docs/token-setup.md）"; echo "SKIP=1" >> "$GITHUB_ENV"; exit 0; fi
+          python -m threads_auto fetch-insights
       - name: Update format ranking / idea weights / report
+        if: env.SKIP != '1'
         run: |
           python -m threads_auto update-weights
           cat "$(ls -t data/reports/*.md | head -1)" >> "$GITHUB_STEP_SUMMARY"
       - name: Commit state
+        if: env.SKIP != '1'
         run: |
           git config user.name "threads-bot"
           git config user.email "threads-bot@users.noreply.github.com"
