@@ -18,6 +18,10 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          # 定期実行は起動時点の古いコミットを取り出すことがある。直前の公開結果を必ず読むよう、最新の main を取り出す
+          # （2026-10-08 古いキューを読んで返信を二重に投稿したため）
+          ref: main
       - uses: actions/setup-python@v5
         with:
           python-version: "3.11"

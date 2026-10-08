@@ -142,6 +142,13 @@ class PublishTests(Base):
         self.assertFalse([c for c in fake.calls if c[0] == "POST"])
         self.assertEqual(json.loads((self.root / "posted" / "a.json").read_text())["media_id"], "m99")
 
+    def test_recovered_post_does_not_repost_replies(self):
+        self.enqueue("a", queue_item("同じ 本文", replies=["返信"]))
+        fake = FakeThreads(recent=[{"id": "m99", "text": "同じ本文"}])
+        publish.publish_due(self.client(fake), self.store, self.settings, NOW)
+        self.assertFalse([c for c in fake.calls if c[0] == "POST"])
+        self.assertTrue(json.loads((self.root / "posted" / "a.json").read_text())["replies_unverified"])
+
     def test_reply_failure_keeps_main_post_and_retries_only_replies(self):
         self.enqueue("a", queue_item("本文", replies=["返信1", "返信2"]))
         fake = FakeThreads(fail_replies=True)
@@ -203,6 +210,18 @@ class PublishTests(Base):
         self.enqueue("a", queue_item(scheduled_at="2026-10-01T12:15:00+09:00"))
         slots = publish.next_free_slots(self.store, self.settings, NOW, 3)
         self.assertEqual([s.strftime("%m-%d %H:%M") for s in slots], ["10-01 20:30", "10-02 07:30", "10-02 12:15"])
+
+
+class CarouselTests(Base):
+    def test_carousel_post(self):
+        self.enqueue("c", queue_item("写真と図解", image_urls=["https://e.com/a.jpg", "https://e.com/b.png"]))
+        fake = FakeThreads()
+        publish.publish_due(lambda: self.client(fake), self.store, self.settings, NOW)
+        posts = [p for m, path, p in fake.calls if m == "POST" and path.endswith("/threads")]
+        self.assertEqual([p.get("is_carousel_item") for p in posts[:2]], ["true", "true"])
+        self.assertEqual(posts[2]["media_type"], "CAROUSEL")
+        self.assertEqual(posts[2]["children"], "c1,c2")
+        self.assertTrue((self.root / "posted" / "c.json").exists())
 
 
 class ValidateTests(Base):

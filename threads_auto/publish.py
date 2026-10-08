@@ -78,11 +78,17 @@ def publish_due(client: ThreadsClient | Callable[[], ThreadsClient] | None, stor
             # 本文・返信ごとに進捗を保存し、途中で失敗しても公開済みの部分は二度と投稿しない
             media_id = item.get("media_id")
             existing = recent_texts.get(normalize(item["text"]))
+            recovered = False
             if not media_id and existing:
+                # 本文の記録がないのに公開済み＝別の実行がすでに公開した可能性が高い。
+                # 返信もその実行が付けているはずなので、二重投稿を避けて返信は付けない（2026-10-08 返信の二重投稿）
                 media_id = existing["id"]
-                log.append(f"RECOVERED {path.name}: 本文は公開済み（{media_id}）。未投稿の返信だけ続ける")
+                recovered = True
+                log.append(f"RECOVERED {path.name}: 本文は公開済み（{media_id}）。返信は二重投稿を避けるため付けない（要確認）")
             if not media_id:
-                if item.get("image_url"):
+                if len(item.get("image_urls") or []) >= 2:
+                    media_id = client.post_carousel(item["image_urls"], item["text"])
+                elif item.get("image_url"):
                     media_id = client.post_image(item["image_url"], item["text"])
                 else:
                     media_id = client.post_text(item["text"])
@@ -90,7 +96,10 @@ def publish_due(client: ThreadsClient | Callable[[], ThreadsClient] | None, stor
             store.save(path, item)
             reply_ids = list(item.get("reply_media_ids", []))
             parent = reply_ids[-1] if reply_ids else media_id
-            for reply in item.get("replies", [])[len(reply_ids):]:
+            pending = [] if recovered else item.get("replies", [])[len(reply_ids):]
+            if recovered and item.get("replies") and not reply_ids:
+                item["replies_unverified"] = True
+            for reply in pending:
                 parent = client.post_text(reply, reply_to_id=parent)
                 reply_ids.append(parent)
                 item["reply_media_ids"] = reply_ids
