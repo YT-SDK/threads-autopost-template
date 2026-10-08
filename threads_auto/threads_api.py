@@ -73,6 +73,17 @@ class ThreadsClient:
         self.wait_until_ready(creation_id)
         return self.publish_container(creation_id)
 
+    def post_carousel(self, image_urls: list[str], text: str = "") -> str:
+        """複数画像（2〜20枚）の投稿。各画像を子コンテナにし、まとめのコンテナを公開する。"""
+        children = []
+        for url in image_urls:
+            res = self._call("POST", f"{self.user_id}/threads", {"media_type": "IMAGE", "image_url": url, "is_carousel_item": "true"})
+            self.wait_until_ready(res["id"])
+            children.append(res["id"])
+        res = self._call("POST", f"{self.user_id}/threads", {"media_type": "CAROUSEL", "children": ",".join(children), "text": text})
+        self.wait_until_ready(res["id"])
+        return self.publish_container(res["id"])
+
     def publish_container(self, creation_id: str) -> str:
         res = self._call("POST", f"{self.user_id}/threads_publish", {"creation_id": creation_id})
         return res["id"]

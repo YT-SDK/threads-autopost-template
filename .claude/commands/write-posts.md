@@ -46,6 +46,10 @@ description: ステップ4 投稿作成とレビュー — フォーマット×�
      絵（`swatches`・`visual`）を主役にし、文字は少なく（タイトル2行まで・項目は短い句で3つまで）。本文の要点と食い違わないこと。地名・人名・他人の写真は入れない。
   2. 作った画像を目で確認し、`data/config/brand.json` の `cards_repo`（公開リポジトリ）の `c/<スラッグ>.png` に置いて push する。
   3. キューの `image_url` に `<cards_base_url><スラッグ>.png` を入れ、URL が 200 を返すことを確かめる。
+- **AI写真（2026-10-08 本人：無料の範囲で比較中のため、Gamma などクレジット・料金がかかる生成は本人の明示的な指示があるときだけ使う）**：1枚目にAIで作った写真風のイメージ、2枚目に図解カードの複数枚投稿にする（2026-10-08 本人決定）。
+  1. Gamma の generate_image（type: photo, sizePreset: social-portrait）で作る。プロンプトに「no people, no text, no logos, no brand products, no windows with outside view」を入れる。1枚 70 クレジット消費なので、残りクレジットを報告に書く。
+  2. 元画像を scratchpad に保存し、`python tools/make_photo.py <元画像> cards/out/<スラッグ>-photo.jpg` で整える（右下にハンドル名が入り、メタデータは消える。「AIで作った」の表示は付けない）。目で確認し、名作家具そっくり・不自然な物・窓の外の景色があれば使わない。
+  3. カード置き場に置き、キューを `image_urls: [<写真のURL>, <図解のURL>]`・`ai_image: true` にする。本文・返信で「私の部屋」など自宅の写真だと言い切らない。
 - 使ったネタの `ideas.json` の `status` を `used` にし、`used_in` にキューのファイル名を入れる。
 
 ## 5. 機械チェック

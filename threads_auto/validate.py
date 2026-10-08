@@ -64,9 +64,11 @@ def validate_item(
     if jargon:
         warnings.append(f"本文に専門用語があります（返信へ移す）: {'、'.join(jargon)}")
 
-    image_url = item.get("image_url")
-    if image_url and not str(image_url).startswith("https://"):
-        errors.append("image_url は https:// で始まる公開URLにしてください")
+    urls = ([item["image_url"]] if item.get("image_url") else []) + list(item.get("image_urls") or [])
+    if any(not str(u).startswith("https://") for u in urls):
+        errors.append("image_url / image_urls は https:// で始まる公開URLにしてください")
+    if item.get("image_urls") and not 2 <= len(item["image_urls"]) <= 20:
+        errors.append("image_urls（複数枚投稿）は2〜20枚にしてください")
     whole = "\n".join(parts)
     found = [label for label, pat in (identity_terms or {}).items() if re.search(pat, whole)]
     if len(found) >= 2:

@@ -98,7 +98,7 @@ def badge(draw: ImageDraw.ImageDraw, cx: int, cy: int, n: int, r: int = 26) -> N
     draw.text((cx - draw.textlength(t, font=f) / 2, cy - r * 0.78), t, font=f, fill=BG)
 
 
-def visual_room(img: Image.Image, top: int, height: int) -> None:
+def visual_room(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
     """部屋の断面：①テーブル上のペンダント ②角のフロアランプ ③壁のブラケット。"""
     d = ImageDraw.Draw(img)
     x0, x1 = MARGIN, W - MARGIN
@@ -138,7 +138,7 @@ def visual_room(img: Image.Image, top: int, height: int) -> None:
     d.text((x0 + (x1 - x0) // 2 + 150, ceil + 34), "天井の照明はOFF", font=f, fill=SUB)
 
 
-def visual_compare(img: Image.Image, top: int, height: int) -> None:
+def visual_compare(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
     """同じ木とトマトを Ra80台 / Ra90以上 で並べたイメージ。"""
     d = ImageDraw.Draw(img)
     gap = 36
@@ -167,7 +167,7 @@ def visual_compare(img: Image.Image, top: int, height: int) -> None:
     d.text((MARGIN, top + height + 12), "※見え方のイメージです", font=font(FONT_MED, 24), fill=SUB)
 
 
-def visual_grout(img: Image.Image, top: int, height: int) -> None:
+def visual_grout(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
     """白い50角タイルを「白目地・昼光色」と「グレー目地＋明るい木＋電球色」で並べたイメージ。"""
     d = ImageDraw.Draw(img)
     gap = 36
@@ -204,6 +204,214 @@ def visual_grout(img: Image.Image, top: int, height: int) -> None:
 
 
 VISUALS = {"room": visual_room, "compare": visual_compare, "grout": visual_grout}
+
+
+def caption(d: ImageDraw.ImageDraw, top: int, height: int, spec: dict | None) -> None:
+    text = (spec or {}).get("visual_note")
+    if text:
+        d.text((MARGIN, top + height + 12), text, font=font(FONT_MED, 24), fill=SUB)
+
+
+def visual_bars(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
+    """横棒グラフ。spec["bars"] = [[ラベル, 値, "表示する値"], ...]、"bar_highlight" で強調する行。"""
+    d = ImageDraw.Draw(img)
+    bars = spec["bars"]
+    vmax = max(b[1] for b in bars) or 1
+    fl, fv = font(FONT_BOLD, 34), font(FONT_BOLD, 34)
+    label_w = max(d.textlength(b[0], font=fl) for b in bars) + 30
+    x0, x1 = MARGIN + label_w, W - MARGIN - 150
+    row = height // len(bars)
+    for i, (label, value, shown) in enumerate(bars):
+        cy = top + i * row + row // 2
+        hi = i == spec.get("bar_highlight")
+        d.text((MARGIN, cy - 22), label, font=fl, fill=INK)
+        w = int((x1 - x0) * value / vmax)
+        d.rounded_rectangle([x0, cy - 26, x0 + max(w, 12), cy + 26], radius=12, fill=MUSTARD if hi else WALNUT)
+        d.text((x0 + max(w, 12) + 16, cy - 22), shown, font=fv, fill=WALNUT)
+    caption(d, top, height, spec)
+
+
+def visual_pairs(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
+    """色の変化の見本。spec["pairs"] = [[ラベル, 前の色, 後の色, 前の説明, 後の説明], ...]"""
+    d = ImageDraw.Draw(img)
+    pairs = spec["pairs"]
+    row = height // len(pairs)
+    fl, fs = font(FONT_BOLD, 36), font(FONT_MED, 26)
+    sw_w = 300
+    for i, (label, c0, c1, t0, t1) in enumerate(pairs):
+        y = top + i * row + 10
+        d.text((MARGIN, y), label, font=fl, fill=INK)
+        by = y + 54
+        bh = row - 110
+        x_a = MARGIN
+        x_b = W - MARGIN - sw_w
+        for x, c, t in ((x_a, c0, t0), (x_b, c1, t1)):
+            col = hex2rgb(c)
+            d.rounded_rectangle([x, by, x + sw_w, by + bh], radius=14, fill=col)
+            grain = tuple(max(v - 22, 0) for v in col)
+            for k in range(1, 4):
+                gy = by + k * bh // 4
+                d.line([x + 16, gy, x + sw_w - 16, gy + 4], fill=grain, width=3)
+            d.text((x, by + bh + 8), t, font=fs, fill=SUB)
+        ax = (x_a + sw_w + x_b) // 2
+        d.line([x_a + sw_w + 30, by + bh // 2, x_b - 30, by + bh // 2], fill=SUB, width=4)
+        d.polygon([(x_b - 30, by + bh // 2 - 14), (x_b - 6, by + bh // 2), (x_b - 30, by + bh // 2 + 14)], fill=SUB)
+        del ax
+    caption(d, top, height, spec)
+
+
+def visual_timeline(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
+    """年表。spec["events"] = [[年, 説明], ...]"""
+    d = ImageDraw.Draw(img)
+    ev = spec["events"]
+    y = top + height // 2 - 20
+    d.line([MARGIN, y, W - MARGIN, y], fill=LINE, width=6)
+    fy, ft = font(FONT_BOLD, 44), font(FONT_MED, 28)
+    step = (W - 2 * MARGIN) // len(ev)
+    for i, (year, text) in enumerate(ev):
+        cx = MARGIN + step * i + step // 2
+        hi = i == spec.get("event_highlight")
+        r = 18 if hi else 12
+        d.ellipse([cx - r, y - r, cx + r, y + r], fill=MUSTARD if hi else WALNUT)
+        tw = d.textlength(year, font=fy)
+        d.text((cx - tw / 2, y - 90), year, font=fy, fill=WALNUT if not hi else INK)
+        lines = wrap(d, text, ft, step - 20)
+        ty = y + 34
+        for ln in lines:
+            d.text((cx - d.textlength(ln, font=ft) / 2, ty), ln, font=ft, fill=INK)
+            ty += 40
+    caption(d, top, height, spec)
+
+
+def visual_versus(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
+    """2つを並べて比べる。spec["sides"] = [{"title":..., "lines":[...], "tone":"good|bad|plain"}, ...]"""
+    d = ImageDraw.Draw(img)
+    gap = 36
+    pw = (W - 2 * MARGIN - gap) // 2
+    tones = {"good": (252, 236, 208), "bad": (226, 222, 214), "plain": (240, 232, 218)}
+    ft, fl = font(FONT_BOLD, 38), font(FONT_MED, 30)
+    for i, side in enumerate(spec["sides"]):
+        x = MARGIN + i * (pw + gap)
+        d.rounded_rectangle([x, top, x + pw, top + height], radius=24, fill=tones.get(side.get("tone", "plain")))
+        ty = draw_lines(d, (x + 28, top + 26), wrap(d, side["title"], ft, pw - 56), ft, INK, 1.25)
+        d.line([x + 28, ty + 8, x + pw - 28, ty + 8], fill=LINE, width=3)
+        ly = ty + 30
+        for line in side["lines"]:
+            ly = draw_lines(d, (x + 28, ly), wrap(d, "・" + line, fl, pw - 56), fl, SUB, 1.35) + 8
+    caption(d, top, height, spec)
+
+
+def visual_area(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
+    """小さな色見本と、同じ色の大きな壁。spec["color"] は見本の色、spec["wall_color"] は壁で見える色。"""
+    d = ImageDraw.Draw(img)
+    base = hex2rgb(spec["color"])
+    wall = hex2rgb(spec.get("wall_color", spec["color"]))
+    f = font(FONT_BOLD, 32)
+    # 色見本
+    sx, sy = MARGIN + 30, top + height // 2 - 60
+    d.rounded_rectangle([sx - 18, sy - 70, sx + 170, sy + 190], radius=14, fill=(255, 255, 255), outline=LINE, width=3)
+    d.rectangle([sx, sy - 50, sx + 152, sy + 102], fill=base)
+    d.text((sx, sy + 120), "色見本", font=f, fill=INK)
+    # 壁（部屋の奥の面）
+    x0, x1 = MARGIN + 300, W - MARGIN
+    d.polygon([(x0, top), (x1, top), (x1, top + height - 40), (x0, top + height - 40)], fill=wall)
+    d.rectangle([x0, top + height - 40, x1, top + height], fill=(214, 196, 168))
+    d.rounded_rectangle([x0 + 160, top + height - 150, x0 + 470, top + height - 60], radius=18, fill=(244, 236, 220))
+    d.text((x0 + 24, top + 20), "同じ色を壁一面に", font=f, fill=INK)
+    caption(d, top, height, spec)
+
+
+def visual_chair(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
+    """横から見たテーブルと椅子。天板と座面の差を矢印で示す。spec["gap_label"]"""
+    d = ImageDraw.Draw(img)
+    floor = top + height - 30
+    d.line([MARGIN, floor, W - MARGIN, floor], fill=WALNUT, width=6)
+    # テーブル
+    tt = floor - 250
+    d.rounded_rectangle([MARGIN + 380, tt, W - MARGIN - 40, tt + 18], radius=6, fill=WALNUT)
+    for lx in (MARGIN + 420, W - MARGIN - 80):
+        d.line([lx, tt + 18, lx, floor], fill=WALNUT, width=10)
+    # 椅子（座面・背もたれ・細い脚）
+    seat = floor - 150
+    cx0, cx1 = MARGIN + 140, MARGIN + 330
+    d.rounded_rectangle([cx0, seat, cx1, seat + 16], radius=6, fill=INK)
+    d.line([cx0 + 10, seat - 170, cx0 + 24, seat], fill=INK, width=10)
+    for lx in (cx0 + 20, cx1 - 20):
+        d.line([lx, seat + 16, lx, floor], fill=INK, width=6)
+    # 矢印（座面の高さ〜天板の高さ）
+    ax = MARGIN + 365
+    d.line([cx1, seat, ax + 40, seat], fill=LINE, width=3)
+    d.line([ax, tt + 4, ax, seat], fill=MUSTARD, width=6)
+    for yy, s in ((tt + 4, 1), (seat, -1)):
+        d.polygon([(ax - 14, yy + 18 * s), (ax, yy), (ax + 14, yy + 18 * s)], fill=MUSTARD)
+    label = spec.get("gap_label", "")
+    f = font(FONT_BOLD, 44)
+    lx = (MARGIN + 420 + W - MARGIN - 80) // 2 - d.textlength(label, font=f) / 2  # テーブルの下、脚の間
+    d.text((lx, (tt + seat) // 2 - 10), label, font=f, fill=INK)
+    d.line([ax + 10, (tt + seat) // 2 + 14, lx - 14, (tt + seat) // 2 + 14], fill=MUSTARD, width=3)
+    caption(d, top, height, spec)
+
+
+def visual_lantern(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
+    """骨が規則正しい提灯と、不規則な骨の和紙のあかり。"""
+    import random
+    d = ImageDraw.Draw(img)
+    gap = 36
+    pw = (W - 2 * MARGIN - gap) // 2
+    labels = spec.get("labels", ["規則正しい骨", "不規則な骨"])
+    f = font(FONT_BOLD, 32)
+    for i in range(2):
+        x = MARGIN + i * (pw + gap)
+        d.rounded_rectangle([x, top, x + pw, top + height], radius=24, fill=(240, 232, 218))
+        cx, cy = x + pw // 2, top + height // 2 - 10
+        rx, ry = 110, 128
+        glow(img, cx, cy, 170, (255, 200, 130), 150)
+        d = ImageDraw.Draw(img)
+        d.line([cx, top + 20, cx, cy - ry], fill=INK, width=3)
+        d.ellipse([cx - rx, cy - ry, cx + rx, cy + ry], fill=(253, 244, 226), outline=SUB, width=3)
+        rnd = random.Random(7)
+        for k in range(1, 9):
+            if i == 0:
+                yy = cy - ry + k * (2 * ry) // 9
+                off = 0
+            else:
+                yy = cy - ry + k * (2 * ry) // 9 + rnd.randint(-14, 14)
+                off = rnd.randint(-18, 18)
+            dy = yy - cy
+            half = int(rx * (1 - (dy / ry) ** 2) ** 0.5) if abs(dy) < ry else 0
+            d.line([cx - half, yy - off // 2, cx + half, yy + off // 2], fill=SUB, width=2)
+        d.text((x + 24, top + height - 54), labels[i], font=f, fill=INK)
+    caption(d, top, height, spec)
+
+
+def visual_rug(img: Image.Image, top: int, height: int, spec: dict | None = None) -> None:
+    """上から見たダイニング。テーブルの周りにラグの余白（spec["margin_label"]）。"""
+    d = ImageDraw.Draw(img)
+    cx = W // 2
+    rug_w, rug_h = 720, height - 40
+    rx0, ry0 = cx - rug_w // 2, top + 10
+    d.rounded_rectangle([rx0, ry0, rx0 + rug_w, ry0 + rug_h], radius=20, fill=(232, 214, 186), outline=SUB, width=3)
+    tw, th = 300, 150
+    tx0, ty0 = cx - tw // 2, ry0 + rug_h // 2 - th // 2
+    d.rounded_rectangle([tx0, ty0, tx0 + tw, ty0 + th], radius=12, fill=WALNUT)
+    for sx in (tx0 + 50, tx0 + tw - 110):
+        for sy, h in ((ty0 - 80, 60), (ty0 + th + 20, 60)):
+            d.rounded_rectangle([sx, sy, sx + 60, sy + h], radius=10, fill=INK)
+    f = font(FONT_BOLD, 30)
+    label = spec.get("margin_label", "")
+    # 余白の矢印（テーブルの横）
+    ay = ty0 + th // 2
+    for xa, xb in ((rx0, tx0), (tx0 + tw, rx0 + rug_w)):
+        d.line([xa + 8, ay, xb - 8, ay], fill=MUSTARD, width=5)
+        tl = d.textlength(label, font=f)
+        d.text(((xa + xb) / 2 - tl / 2, ay - 46), label, font=f, fill=INK)
+    caption(d, top, height, spec)
+
+
+VISUALS.update({
+    "bars": visual_bars, "pairs": visual_pairs, "timeline": visual_timeline, "versus": visual_versus,
+    "area": visual_area, "chair": visual_chair, "lantern": visual_lantern, "rug": visual_rug,
+})
 
 
 def header(draw: ImageDraw.ImageDraw, spec: dict) -> int:
@@ -273,7 +481,7 @@ def listing(spec: dict) -> Image.Image:
     y = header(d, spec)
     if spec.get("visual"):
         vh = spec.get("visual_height", 400)
-        VISUALS[spec["visual"]](img, y - 10, vh)
+        VISUALS[spec["visual"]](img, y - 10, vh, spec)
         d = ImageDraw.Draw(img)
         y += vh + 40
     items = spec["items"]
